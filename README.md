@@ -32,7 +32,8 @@ The benchmark relies on `fraud_detection_dataset.csv`, a synthetic financial tra
 
 1. **Feature Renaming**: The column originally labeled `merchant_risk_score` was identified as mislabeled because lower numerical values correspond to suspicious merchants, while higher values indicate trusted merchants. To align documentation with actual feature behavior, it is designated as `merchant_trust_score` without altering raw data values.
 2. **2-Feature Quantum Benchmark Selection**: To evaluate quantum feature interactions on 2-qubit simulators, two core risk features were selected for model inputs:
-   $$\mathbf{x} = \left[ \text{device\_trust\_score}, \text{merchant\_trust\_score} \right]$$
+
+$$\mathbf{x} = \left[ \mathtt{device\_trust\_score}, \mathtt{merchant\_trust\_score} \right]$$
 
 ---
 
@@ -127,7 +128,7 @@ While Phase 1 validated the hybrid workflow on statevector simulators, **Phase 2
 ┌───────────────────────────────┐          ┌─────────────────────────────────────────┐
 │ • PennyLane / Qiskit Aer      │          │ • IBM Quantum Heron / Eagle QPU         │
 │ • Statevector Execution       │          │ • Transpilation & Layout Mapping        │
-│ • Ideal / Zero-Noise           │ ───────► │ • Readout Error Mitigation (M3)         │
+│ • Ideal / Zero-Noise          │ ───────► │ • Readout Error Mitigation (M3)         │
 │ • PR-AUC: 0.3979              │          │ • Zero-Noise Extrapolation (ZNE)        │
 │ • Benchmark Comparison        │          │ • Projected to Overshoot XGBoost        │
 └───────────────────────────────┘          └─────────────────────────────────────────┘

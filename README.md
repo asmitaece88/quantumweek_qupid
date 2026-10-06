@@ -33,7 +33,7 @@ The benchmark relies on `fraud_detection_dataset.csv`, a synthetic financial tra
 1. **Feature Renaming**: The column originally labeled `merchant_risk_score` was identified as mislabeled because lower numerical values correspond to suspicious merchants, while higher values indicate trusted merchants. To align documentation with actual feature behavior, it is designated as `merchant_trust_score` without altering raw data values.
 2. **2-Feature Quantum Benchmark Selection**: To evaluate quantum feature interactions on 2-qubit simulators, two core risk features were selected for model inputs:
 
-$$\mathbf{x} = \left[ \mathtt{device\_trust\_score}, \mathtt{merchant\_trust\_score} \right]$$
+$$\mathbf{x} = \left[ \text{device trust score},\; \text{merchant trust score} \right]$$
 
 ---
 
@@ -130,7 +130,7 @@ While Phase 1 validated the hybrid workflow on statevector simulators, **Phase 2
 │ • Statevector Execution       │          │ • Transpilation & Layout Mapping        │
 │ • Ideal / Zero-Noise          │ ───────► │ • Readout Error Mitigation (M3)         │
 │ • PR-AUC: 0.3979              │          │ • Zero-Noise Extrapolation (ZNE)        │
-│ • Benchmark Comparison        │          │ • Projected to Overshoot XGBoost        │
+│ • Benchmark Comparison        │          │ • Fair comparison with XGBoost          │
 └───────────────────────────────┘          └─────────────────────────────────────────┘
 ```
 
@@ -139,7 +139,7 @@ While Phase 1 validated the hybrid workflow on statevector simulators, **Phase 2
 1. **Backend-Aware Transpilation**: Mapping 2-qubit virtual circuits to native QPU coupling maps, optimizing single-qubit gate decompositions ($R_z, \sqrt{X}, X$) and minimizing CNOT counts.
 2. **Readout Error Mitigation (M3)**: Matrix Inversion and Measurement Mitigation (`qiskit-m3`) to correct assignment errors on noisy physical measurements.
 3. **Zero-Noise Extrapolation (ZNE)**: Intentionally scaling circuit noise to extrapolate zero-noise expectation values $\langle Z_0 \rangle_{noise \to 0}$.
-4. **Performance Projection**: Simulation VQC results closely track XGBoost. Upon deploying to real IBM Quantum hardware with error mitigation, **quantum kernel expressivity and non-linear entangling capacities are projected to overshoot classical XGBoost performance**.
+4. **Performance Validation**: Simulation VQC results closely track XGBoost. Real IBM Quantum hardware runs with error mitigation will test whether the VQC can maintain or improve its ranking quality under realistic noise; outperforming XGBoost is a hypothesis to validate, not a guaranteed outcome.
 
 ---
 

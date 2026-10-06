@@ -1,116 +1,177 @@
-================================================================================
-QUANTUM FRAUD DETECTION WITH HYBRID VARIATIONAL CIRCUITS (VQC)
-================================================================================
-Project: Q-Hack India 2026 Prototype
-Track: Hybrid Quantum-Classical Machine Learning for Rare Event Detection
-Team: Team Qupid
+# Quantum Fraud Detection with Hybrid Variational Circuits
 
---------------------------------------------------------------------------------
-1. EXECUTIVE OVERVIEW
---------------------------------------------------------------------------------
-This repository implements a Round 1 prototype for payment fraud detection using a
-hybrid quantum-classical Variational Quantum Classifier (VQC) compared against
-a feature-matched XGBoost classical benchmark. 
+This repository provides a proof-of-concept (PoC) implementation of a **hybrid quantum-classical fraud detection engine**. The project evaluates **Variational Quantum Classifiers (VQCs)**—built with **PennyLane** and **Qiskit**—against a feature-matched **XGBoost** classical benchmark to identify rare, high-risk payment fraud transactions in financial telemetry data.
 
-Because financial fraud is a rare-event detection problem, standard accuracy
-is a misleading metric (predicting 'legitimate' for all transactions yields ~98%
-accuracy while catching zero fraud). Therefore, this project evaluates fraud
-ranking capability using Precision-Recall Area Under Curve (PR-AUC), Recall,
-Precision, and False-Positive counts to optimize alert queues for human fraud
-investigators.
+---
 
---------------------------------------------------------------------------------
-2. DATASET CHARACTERISTICS & EXTREME CLASS IMBALANCE
---------------------------------------------------------------------------------
-The synthetic financial dataset (`fraud_detection_dataset.csv`) contains:
-  * Total Transactions: 2,000
-  * Legitimate Cases: 1,960 (98.0%)
-  * Fraudulent Cases: 40 (2.0% extreme fraud rate)
+## 1. Executive Summary
 
-Selected Feature Pair for Fair Comparison:
-  Both quantum and classical models are trained and evaluated on the exact same
-  two input features:
-  1. `device_trust_score`: Trustworthiness metric derived from device telemetry.
-  2. `merchant_trust_score`: Merchant reliability metric.
+Financial payment fraud is a classic **rare-event detection problem**. In real-world payment networks, legitimate transactions drastically outnumber fraudulent attempts.
 
-Feature Mislabeling Correction:
-  The dataset column originally named `merchant_risk_score` was corrected to
-  `merchant_trust_score`. Analysis confirmed that higher values correspond to
-  higher merchant trustworthiness (lower risk), while lower values indicate
-  suspicious merchants. No numerical feature values or fraud labels were changed.
+* **The Accuracy Paradox**: Evaluating models using standard accuracy is misleading. A trivial classifier predicting "legitimate" for every transaction achieves ~98% accuracy while failing to detect a single fraudulent event.
+* **Core Objective**: Optimize for fraud ranking quality using **Precision-Recall Area Under Curve (PR-AUC)**, **Recall**, **Precision**, and **False Positive alert counts** to route the highest-risk transactions into a manageable review queue for human investigators.
 
-Data Split & Balance Strategy:
-  * Evaluation Contract: An untouched held-out test set of 600 transactions
-    containing 12 fraud cases (2.0% fraud rate) was reserved (seed 31).
-  * VQC Fit Subset Oversampling: To train the variational quantum circuit on
-    an imbalanced domain, fraud cases were oversampled exclusively in the VQC
-    training fitting subset (240 samples, 47.5% fraud). The held-out test set
-    remained entirely untouched.
+---
 
---------------------------------------------------------------------------------
-3. TECHNICAL APPROACH & ARCHITECTURE
---------------------------------------------------------------------------------
-A. Classical Benchmark (XGBoost):
-   * Architecture: Gradient boosted decision trees using the feature-matched pair
-     (`device_trust_score`, `merchant_trust_score`).
-   * Purpose: Serves as the state-of-the-art classical baseline evaluated on the
-     untouched held-out test set.
+## 2. Dataset Architecture & Column Analysis
 
-B. Quantum Approach (Hybrid Variational Quantum Classifier - VQC):
-   * Frameworks: Developed using PennyLane, Qiskit, Qiskit Aer, and Qiskit Machine
-     Learning.
-   * Feature Map (Angle Encoding): Both continuous features are scaled to [-pi, pi]
-     and embedded into a 2-qubit Hilbert space via single-qubit rotations.
-   * Variational Ansatz: Parameterized entangling layers consisting of single-qubit
-     rotation gates (RY, RZ) and CNOT entanglers to capture non-linear feature
-     interactions in compact quantum state space.
-   * Hybrid Optimization Loop: Classical optimizer (COBYLA) updates trainable
-     circuit parameters iteratively.
-   * Fraud Probability Output: Pauli-Z expectation value measurement is mapped
-     directly to transaction fraud probability.
+The benchmark relies on `fraud_detection_dataset.csv`, a synthetic financial transaction dataset containing **2,000 records** with a severe **2.0% fraud class imbalance** (1,960 legitimate transactions vs. 40 fraudulent cases).
 
---------------------------------------------------------------------------------
-4. POC SIMULATION RESULTS (HELD-OUT TEST SET: 600 TRANSACTIONS, 12 FRAUD CASES)
---------------------------------------------------------------------------------
-+--------------------+---------+--------+-----------+-----------------+
-| Model              | PR-AUC  | Recall | Precision | False Positives |
-+--------------------+---------+--------+-----------+-----------------+
-| PennyLane VQC sim  | 0.3979  | 100.0% |   5.9%    |      193        |
-| XGBoost Benchmark  | 0.4103  |  91.7% |  28.9%    |       27        |
-+--------------------+---------+--------+-----------+-----------------+
+### Detailed Column Breakdown
 
-Key Findings:
-  * PennyLane VQC achieved a PR-AUC of 0.3979, closely matching classical XGBoost
-    (0.4103) while capturing 100% of genuine fraud cases (12/12) in simulation.
-  * XGBoost provided higher precision (28.9%) and fewer false positives (27).
+| Column Name | Data Type | Range / Values | Mean (Overall) | Fraud vs. Non-Fraud Behavior | Role & Description |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `transaction_amount` | Continuous Float | \$2.30 – \$688.44 | \$56.28 | **Fraud**: \$63.35 mean<br>**Legit**: \$56.14 mean | Monetary value of the payment attempt in USD. Fraudulent transactions exhibit higher variance and slightly elevated average transaction values. |
+| `device_trust_score` | Continuous Float | 0.082 – 0.996 | 0.711 | **Fraud**: 0.638 mean<br>**Legit**: 0.712 mean | Normalized trust metric calculated from device fingerprinting, IP reputation, and hardware signals. Lower scores reflect compromised or unrecognized devices. |
+| `merchant_risk_score` *(Mislabeled)* | Continuous Float | 0.0003 – 0.820 | 0.240 | **Fraud**: 0.075 mean<br>**Legit**: 0.244 mean | **Renamed to `merchant_trust_score`**. Represents merchant reliability. Fraudulent activity heavily clusters at very low trust values ($\le 0.08$). |
+| `location_distance_km` | Continuous Float | 0.35 km – 96.32 km | 19.57 km | **Fraud**: 19.14 km mean<br>**Legit**: 19.58 km mean | Geographic distance between the transaction initiation point and the cardholder's historical billing centroid. |
+| `transactions_last_hour` | Integer | 0 – 7 counts | 1.08 counts | **Fraud**: 1.60 mean<br>**Legit**: 1.07 mean | Velocity metric measuring total transaction attempts from the same card/account within the preceding 60 minutes. |
+| `fraud` | Binary Indicator | 0 or 1 | 0.020 (2.0%) | **0**: 1,960 (98.0%)<br>**1**: 40 (2.0%) | **Target Variable**. $0 = \text{Legitimate Transaction}$, $1 = \text{Fraudulent Transaction}$. |
 
---------------------------------------------------------------------------------
-5. PHASE 2 IMPLEMENTATION ROADMAP: IBM QUANTUM CLOUD HARDWARE
---------------------------------------------------------------------------------
-Phase 1 (Current): Local Simulator PoC
-  * Executed on local statevector simulators (PennyLane / Qiskit Aer).
-  * Established baseline feature encoding and optimization pipelines.
+### Dataset Clarification & Feature Selection
 
-Phase 2 (Upcoming): IBM Quantum Cloud Prediction Prototype
-  * Transpilation: Backend-aware transpilation matching native physical qubit
-    coupling maps on IBM Quantum processors.
-  * Hardware Execution: Running variational circuits on real quantum hardware.
-  * Error Mitigation: Implementing readout error mitigation (M3) and Zero-Noise
-    Extrapolation (ZNE) to mitigate gate noise and decoherence.
-  * Hypothesis: With proper error mitigation and expanded expressive ansätze,
-    real quantum hardware is projected to surpass classical XGBoost ranking
-    performance by exploring higher-dimensional entangling spaces.
+1. **Feature Renaming**: The column originally labeled `merchant_risk_score` was identified as mislabeled because lower numerical values correspond to suspicious merchants, while higher values indicate trusted merchants. To align documentation with actual feature behavior, it is designated as `merchant_trust_score` without altering raw data values.
+2. **2-Feature Quantum Benchmark Selection**: To evaluate quantum feature interactions on 2-qubit simulators, two core risk features were selected for model inputs:
+   $$\mathbf{x} = \left[ \text{device\_trust\_score}, \text{merchant\_trust\_score} \right]$$
 
---------------------------------------------------------------------------------
-6. REPOSITORY STRUCTURE & DEPENDENCIES
---------------------------------------------------------------------------------
-Files:
-  * `quantum_vqc_fraud_detection.ipynb`: Main prototype execution notebook.
-  * `fraud_detection_dataset.csv`: 2,000 transaction dataset with fraud labels.
-  * `requirements.txt`: Python package manifest (qiskit, pennylane, xgboost,
-    scikit-learn, pandas, numpy, matplotlib).
-  * `README.md`: Project summary documentation.
+---
 
-Dependencies Installation:
-  $ pip install -r requirements.txt
-================================================================================
+## 3. Data Preprocessing & Split Pipeline
+
+To ensure a rigorous and fair benchmark between classical and quantum models, both paradigms execute on the exact same data splits and evaluation contracts.
+
+* **Held-Out Test Set**: 600 transactions (**12 actual fraud cases, 2.0% fraud rate**) reserved exclusively for final evaluation ($Seed = 31$).
+* **Training Subset Oversampling**: The training fitting set (1,400 transactions) is oversampled for the VQC fitting step to produce a balanced 240-sample set (**47.5% fraud rate**) to prevent gradient starvation in variational parameter updates.
+* **Feature Angle Scaling**: Both trust features are rescaled from $[0, 1]$ to the interval $[-\pi, \pi]$:
+  $$x_i \mapsto x_i' = 2\pi x_i - \pi$$
+
+---
+
+## 4. Model Approaches: Classical vs. Hybrid VQC
+
+```
+                    ┌─────────────────────────────────────────────────────────┐
+                    │               Raw Payment Telemetry                     │
+                    │      (device_trust_score, merchant_trust_score)         │
+                    └────────────────────────────┬────────────────────────────┘
+                                                 │
+                        ┌────────────────────────┴────────────────────────┐
+                        ▼                                                 ▼
+        ┌───────────────────────────────┐                 ┌───────────────────────────────┐
+        │     Classical Pipeline        │                 │    Hybrid Quantum Pipeline    │
+        │           (XGBoost)           │                 │    (PennyLane / Qiskit VQC)   │
+        └───────────────┬───────────────┘                 └───────────────┬───────────────┘
+                        │                                                 │
+                        │                                  Angle Encoding: x -> [-π, π]
+                        │                                                 │
+                        │                                 2-Qubit Variational Ansatz
+                        │                                 (RY/RZ + CNOT Entanglers)
+                        │                                                 │
+                        │                                 Pauli-Z Expectation Measurement
+                        │                                                 │
+                        │                                 Classical COBYLA Optimizer
+                        │                                                 │
+                        ▼                                                 ▼
+        ┌───────────────────────────────┐                 ┌───────────────────────────────┐
+        │  Probability Score [0.0, 1.0] │                 │  Probability Score [0.0, 1.0] │
+        └───────────────┬───────────────┘                 └───────────────┬───────────────┘
+                        │                                                 │
+                        └────────────────────────┬────────────────────────┘
+                                                 │
+                                                 ▼
+                                ┌──────────────────────────────────┐
+                                │   PR-AUC & Fraud Review Queue    │
+                                └──────────────────────────────────┘
+```
+
+### Classical Baseline: XGBoost
+
+* **Architecture**: Feature-matched Gradient Boosted Decision Trees trained on the 2 selected trust features.
+* **Hyperparameters**: `max_depth=3`, `n_estimators=100`, `learning_rate=0.05`, `scale_pos_weight=49` to account for class imbalance.
+* **Mechanism**: Partitions feature space using orthogonal decision boundaries to compute fraud probability logits.
+
+### Quantum Approach: Hybrid Variational Quantum Classifier (VQC)
+
+* **Frameworks**: Implemented via **PennyLane** (`default.qubit`) and **Qiskit Aer** (`StatevectorSampler`).
+* **Qubit Topology**: 2-qubit quantum register corresponding to the 2 input features.
+* **Feature Encoding**: Angle embedding where feature values $x_1', x_2' \in [-\pi, \pi]$ drive single-qubit rotation gates:
+  $$|\psi_0\rangle = U_{enc}(\mathbf{x}')|00\rangle = \left( R_Y(x_1') \otimes R_Y(x_2') \right) |00\rangle$$
+* **Variational Ansatz**: Parameterized entangling circuit with $L$ layers:
+  $$U_{var}(\boldsymbol{\theta}) = \prod_{l=1}^L \left[ \text{CNOT}_{0,1} \cdot \left( R_Z(\theta_{l,1}) \otimes R_Z(\theta_{l,2}) \right) \cdot \left( R_Y(\theta_{l,3}) \otimes R_Y(\theta_{l,4}) \right) \right]$$
+* **Measurement & Post-Processing**: Expectation value of Pauli-$Z$ operator on the primary qubit is mapped to a calibrated fraud probability $P(\text{Fraud}) \in [0, 1]$:
+  $$\langle Z_0 \rangle = \langle \psi(\mathbf{x}, \boldsymbol{\theta}) | Z_0 | \psi(\mathbf{x}, \boldsymbol{\theta}) \rangle \implies P(\text{Fraud}) = \frac{1 - \langle Z_0 \rangle}{2}$$
+* **Optimization Loop**: Classical **COBYLA** (Constrained Optimization BY Linear Approximation) optimizer updates circuit parameters $\boldsymbol{\theta}$ across 100 iterations.
+
+---
+
+## 5. Experimental Results & Performance Comparison
+
+Evaluated on the **untouched 600-transaction test set** (12 fraud cases):
+
+| Metric | PennyLane VQC (Simulation PoC) | XGBoost (Classical Baseline) | Operational Significance |
+| :--- | :--- | :--- | :--- |
+| **PR-AUC** | **0.3979** | **0.4103** | VQC closely tracks XGBoost in precision-recall ranking power. |
+| **Fraud Recall** | **100.0% (12 / 12)** | **91.7% (11 / 12)** | PennyLane VQC captured **every single fraudulent transaction**. |
+| **Precision** | **5.9%** | **28.9%** | XGBoost maintains higher precision in simulation. |
+| **False Positives** | **193** | **27** | VQC simulation flagged more false alarms; threshold tuning required. |
+| **Held-Out Test Size**| **600 transactions** | **600 transactions** | Identical evaluation split ($Seed = 31$). |
+
+---
+
+## 6. Phase 2 Roadmap: IBM Quantum Cloud & Hardware Error Mitigation
+
+While Phase 1 validated the hybrid workflow on statevector simulators, **Phase 2 moves execution to real quantum hardware on the IBM Quantum Cloud**.
+
+```
+  Phase 1: Local Simulator PoC               Phase 2: IBM Quantum Cloud Prototype
+┌───────────────────────────────┐          ┌─────────────────────────────────────────┐
+│ • PennyLane / Qiskit Aer      │          │ • IBM Quantum Heron / Eagle QPU         │
+│ • Statevector Execution       │          │ • Transpilation & Layout Mapping        │
+│ • Ideal / Zero-Noise           │ ───────► │ • Readout Error Mitigation (M3)         │
+│ • PR-AUC: 0.3979              │          │ • Zero-Noise Extrapolation (ZNE)        │
+│ • Benchmark Comparison        │          │ • Projected to Overshoot XGBoost        │
+└───────────────────────────────┘          └─────────────────────────────────────────┘
+```
+
+### Hardware Execution Architecture
+
+1. **Backend-Aware Transpilation**: Mapping 2-qubit virtual circuits to native QPU coupling maps, optimizing single-qubit gate decompositions ($R_z, \sqrt{X}, X$) and minimizing CNOT counts.
+2. **Readout Error Mitigation (M3)**: Matrix Inversion and Measurement Mitigation (`qiskit-m3`) to correct assignment errors on noisy physical measurements.
+3. **Zero-Noise Extrapolation (ZNE)**: Intentionally scaling circuit noise to extrapolate zero-noise expectation values $\langle Z_0 \rangle_{noise \to 0}$.
+4. **Performance Projection**: Simulation VQC results closely track XGBoost. Upon deploying to real IBM Quantum hardware with error mitigation, **quantum kernel expressivity and non-linear entangling capacities are projected to overshoot classical XGBoost performance**.
+
+---
+
+## 7. Software Dependencies & Installation
+
+Required dependencies specified in `requirements.txt`:
+
+```text
+qiskit>=1.0.0
+qiskit-aer
+qiskit_machine_learning
+qiskit-algorithms
+pennylane>=0.35.0
+numpy
+pandas
+matplotlib
+scikit-learn
+scipy
+xgboost
+jupyter
+pylatexenc
+```
+
+### Quickstart
+
+```bash
+# Clone repository
+git clone https://github.com/your-org/quantum-fraud-detection.git
+cd quantum-fraud-detection
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Run prototype notebook
+jupyter notebook quantum_vqc_fraud_detection.ipynb
+```

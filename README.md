@@ -23,17 +23,16 @@ The benchmark relies on `fraud_detection_dataset.csv`, a synthetic financial tra
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | `transaction_amount` | Continuous Float | \$2.30 – \$688.44 | \$56.28 | **Fraud**: \$63.35 mean<br>**Legit**: \$56.14 mean | Monetary value of the payment attempt in USD. Fraudulent transactions exhibit higher variance and slightly elevated average transaction values. |
 | `device_trust_score` | Continuous Float | 0.082 – 0.996 | 0.711 | **Fraud**: 0.638 mean<br>**Legit**: 0.712 mean | Normalized trust metric calculated from device fingerprinting, IP reputation, and hardware signals. Lower scores reflect compromised or unrecognized devices. |
-| `merchant_risk_score` *(Mislabeled)* | Continuous Float | 0.0003 – 0.820 | 0.240 | **Fraud**: 0.075 mean<br>**Legit**: 0.244 mean | **Renamed to `merchant_trust_score`**. Represents merchant reliability. Fraudulent activity heavily clusters at very low trust values ($\le 0.08$). |
+| `merchant_risk_score` | Continuous Float | 0.0003 – 0.820 | 0.240 | **Fraud**: 0.075 mean<br>**Legit**: 0.244 mean | Estimated merchant risk signal used directly by the benchmark. Fraud cases in this synthetic dataset cluster at lower values. |
 | `location_distance_km` | Continuous Float | 0.35 km – 96.32 km | 19.57 km | **Fraud**: 19.14 km mean<br>**Legit**: 19.58 km mean | Geographic distance between the transaction initiation point and the cardholder's historical billing centroid. |
 | `transactions_last_hour` | Integer | 0 – 7 counts | 1.08 counts | **Fraud**: 1.60 mean<br>**Legit**: 1.07 mean | Velocity metric measuring total transaction attempts from the same card/account within the preceding 60 minutes. |
 | `fraud` | Binary Indicator | 0 or 1 | 0.020 (2.0%) | **0**: 1,960 (98.0%)<br>**1**: 40 (2.0%) | **Target Variable**. $0 = \text{Legitimate Transaction}$, $1 = \text{Fraudulent Transaction}$. |
 
-### Dataset Clarification & Feature Selection
+### Feature Selection
 
-1. **Feature Renaming**: The column originally labeled `merchant_risk_score` was identified as mislabeled because lower numerical values correspond to suspicious merchants, while higher values indicate trusted merchants. To align documentation with actual feature behavior, it is designated as `merchant_trust_score` without altering raw data values.
-2. **2-Feature Quantum Benchmark Selection**: To evaluate quantum feature interactions on 2-qubit simulators, two core risk features were selected for model inputs:
+The 2-qubit benchmark uses two dataset columns directly: `device_trust_score` and `merchant_risk_score`.
 
-$$\mathbf{x} = \left[ \text{device trust score},\; \text{merchant trust score} \right]$$
+$$\mathbf{x} = \left[ \text{device trust score},\; \text{merchant risk score} \right]$$
 
 ---
 
@@ -53,7 +52,7 @@ To ensure a rigorous and fair benchmark between classical and quantum models, bo
 ```
                     ┌─────────────────────────────────────────────────────────┐
                     │               Raw Payment Telemetry                     │
-                    │      (device_trust_score, merchant_trust_score)         │
+                    │      (device_trust_score, merchant_risk_score)          │
                     └────────────────────────────┬────────────────────────────┘
                                                  │
                         ┌────────────────────────┴────────────────────────┐

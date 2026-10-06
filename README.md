@@ -30,7 +30,12 @@ The benchmark relies on `fraud_detection_dataset.csv`, a synthetic financial tra
 
 ### Feature Selection
 
-The 2-qubit benchmark uses two dataset columns directly: `device_trust_score` and `merchant_risk_score`.
+The 2-qubit benchmark uses two dataset columns directly:
+
+| Feature | Values near 0 | Values near 1 |
+| :--- | :--- | :--- |
+| `device_trust_score` | Low device trust: an unfamiliar, less-established or potentially suspicious device. | High device trust: a familiar, well-established device. |
+| `merchant_risk_score` | Low estimated merchant risk. | High estimated merchant risk: a merchant category or behaviour assessed as more risky. |
 
 $$\mathbf{x} = \left[ \text{device trust score},\; \text{merchant risk score} \right]$$
 
